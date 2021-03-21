@@ -25,7 +25,7 @@ describe("SushiSwapViaETHSwapper", function () {
                 this.bentoBox.address,
                 this.factory.address,
                 await this.factory.pairCodeHash(),
-                this.weth9.address
+                this.weth.address
             )
         })
     })
