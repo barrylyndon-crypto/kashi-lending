@@ -17,8 +17,8 @@ describe("SushiSwapViaETHSwapper", function () {
             await cmd.deploy("weth9", "WETH9Mock")
             await cmd.addToken("weth", "Token B", "WETH", 18, this.RevertingERC20Mock)
 
-            await cmd.addPair("sushiSwapPair", this.a, this.weth, 50000, 50000)
-            await cmd.addPair("sushiSwapPair", this.b, this.weth, 50000, 50000)
+            await cmd.addPair("sushiSwapPairA", this.a, this.weth, 50000, 50000)
+            await cmd.addPair("sushiSwapPairB", this.b, this.weth, 50000, 50000)
 
             await cmd.deploy("bentoBox", "BentoBoxMock", this.weth9.address)
             await cmd.deploy("swapper", "SushiSwapViaETHSwapper",
@@ -36,12 +36,14 @@ describe("SushiSwapViaETHSwapper", function () {
 
     describe("Swap", function () {
         it("should swap", async function () {
+            // TODO: Verify calculations here.
+
             await this.a.approve(this.bentoBox.address, getBigNumber(100))
             await this.bentoBox.deposit(this.a.address, this.alice.address, this.alice.address, getBigNumber(100), 0)
             await this.bentoBox.transfer(this.a.address, this.alice.address, this.swapper.address, getBigNumber(20))
             await expect(this.swapper.swap(this.a.address, this.b.address, this.alice.address, 0, getBigNumber(20)))
                 .to.emit(this.a, "Transfer")
-                .withArgs(this.bentoBox.address, this.sushiSwapPair.address, "20000000000000000000")
+                .withArgs(this.bentoBox.address, this.sushiSwapPairA.address, "20000000000000000000")
                 .to.emit(this.bentoBox, "LogWithdraw")
                 .withArgs(this.a.address, this.swapper.address, this.sushiSwapPair.address, "20000000000000000000", "20000000000000000000")
                 .to.emit(this.b, "Transfer")
