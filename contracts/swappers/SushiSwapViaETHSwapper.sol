@@ -12,14 +12,14 @@ contract SushiSwapViaETHSwapper is ISwapper {
     // Local variables
     IBentoBoxV1 public immutable bentoBox;
     IUniswapV2Factory public immutable factory;
-    address public immutable WETH;
+    IERC20 public immutable WETH;
     bytes32 public pairCodeHash;
 
     constructor(
         IBentoBoxV1 bentoBox_,
         IUniswapV2Factory factory_,
         bytes32 pairCodeHash_,
-        address WETH_
+        IERC20 WETH_
     ) public {
         bentoBox = bentoBox_;
         factory = factory_;
