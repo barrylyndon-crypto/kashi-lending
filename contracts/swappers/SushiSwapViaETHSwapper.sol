@@ -59,44 +59,50 @@ contract SushiSwapViaETHSwapper is ISwapper {
         uint256 shareToMin,
         uint256 shareFrom
     ) public override returns (uint256 extraShare, uint256 shareReturned) {
-        (IERC20 token00, IERC20 token01) = fromToken < WETH ? (fromToken, WETH) : (WETH, fromToken);
-        (IERC20 token10, IERC20 token11) = WETH < toToken ? (WETH, toToken) : (toToken, WETH);
-        IUniswapV2Pair pair0 =
-            IUniswapV2Pair(
+        IUniswapV2Pair pair0;
+        IUniswapV2Pair pair1;
+        {
+            (IERC20 token00, IERC20 token01) = fromToken < WETH ? (fromToken, WETH) : (WETH, fromToken);
+            (IERC20 token10, IERC20 token11) = WETH < toToken ? (WETH, toToken) : (toToken, WETH);
+            pair0 = IUniswapV2Pair(
                 uint256(
                     keccak256(abi.encodePacked(hex"ff", factory, keccak256(abi.encodePacked(address(token00), address(token01))), pairCodeHash))
                 )
             );
-        IUniswapV2Pair pair1 =
-            IUniswapV2Pair(
+            pair1 = IUniswapV2Pair(
                 uint256(
                     keccak256(abi.encodePacked(hex"ff", factory, keccak256(abi.encodePacked(address(token10), address(token11))), pairCodeHash))
                 )
             );
+        }
 
         // Transfer FROM to pair 0 (FROM <-> ETH)
         (uint256 amountFrom, ) = bentoBox.withdraw(fromToken, address(this), address(pair0), 0, shareFrom);
 
         // Swap FROM to ETH. Transfers to pair 1 (ETH <-> TO)
-        (uint256 reserve00, uint256 reserve01, ) = pair0.getReserves();
         uint256 amountETH;
-        if (WETH > fromToken) {
-            amountETH = getAmountOut(amountFrom, reserve00, reserve01);
-            pair0.swap(0, amountETH, address(pair1), "");
-        } else {
-            amountETH = getAmountOut(amountFrom, reserve01, reserve00);
-            pair0.swap(amountETH, 0, address(pair1), "");
+        {
+            (uint256 reserve00, uint256 reserve01, ) = pair0.getReserves();
+            if (WETH > fromToken) {
+                amountETH = getAmountOut(amountFrom, reserve00, reserve01);
+                pair0.swap(0, amountETH, address(pair1), "");
+            } else {
+                amountETH = getAmountOut(amountFrom, reserve01, reserve00);
+                pair0.swap(amountETH, 0, address(pair1), "");
+            }
         }
 
         // Swap ETH to TO. Transfers to the Bentobox
-        (uint256 reserve10, uint256 reserve11, ) = pair1.getReserves();
         uint256 amountTo;
-        if (toToken > WETH) {
-            amountTo = getAmountOut(amountETH, reserve10, reserve11);
-            pair1.swap(0, amountTo, address(bentoBox), "");
-        } else {
-            amountTo = getAmountOut(amountETH, reserve11, reserve10);
-            pair1.swap(amountTo, 0, address(bentoBox), "");
+        {
+            (uint256 reserve10, uint256 reserve11, ) = pair1.getReserves();
+            if (toToken > WETH) {
+                amountTo = getAmountOut(amountETH, reserve10, reserve11);
+                pair1.swap(0, amountTo, address(bentoBox), "");
+            } else {
+                amountTo = getAmountOut(amountETH, reserve11, reserve10);
+                pair1.swap(amountTo, 0, address(bentoBox), "");
+            }
         }
 
         (, shareReturned) = bentoBox.deposit(toToken, address(bentoBox), recipient, amountTo, 0);
@@ -113,21 +119,23 @@ contract SushiSwapViaETHSwapper is ISwapper {
         uint256 shareFromSupplied,
         uint256 shareToExact
     ) public override returns (uint256 shareUsed, uint256 shareReturned) {
-        (IERC20 token00, IERC20 token01) = fromToken < WETH ? (fromToken, WETH) : (WETH, fromToken);
-        (IERC20 token10, IERC20 token11) = WETH < toToken ? (WETH, toToken) : (toToken, WETH);
-        IUniswapV2Pair pair0 =
-            IUniswapV2Pair(
+        IUniswapV2Pair pair0;
+        IUniswapV2Pair pair1;
+        {
+            (IERC20 token00, IERC20 token01) = fromToken < WETH ? (fromToken, WETH) : (WETH, fromToken);
+            (IERC20 token10, IERC20 token11) = WETH < toToken ? (WETH, toToken) : (toToken, WETH);
+            pair0 = IUniswapV2Pair(
                 uint256(
                     keccak256(abi.encodePacked(hex"ff", factory, keccak256(abi.encodePacked(address(token00), address(token01))), pairCodeHash))
                 )
             );
-        IUniswapV2Pair pair1 =
-            IUniswapV2Pair(
+            pair1 = IUniswapV2Pair(
                 uint256(
                     keccak256(abi.encodePacked(hex"ff", factory, keccak256(abi.encodePacked(address(token10), address(token11))), pairCodeHash))
                 )
             );
-            
+        }
+
         // Calculate all the amounts first.
         // This has got to be easier than doing flash swaps:
         uint256 amountToExact = bentoBox.toAmount(toToken, shareToExact, true);
@@ -135,23 +143,33 @@ contract SushiSwapViaETHSwapper is ISwapper {
         // See how much ETH we need to swap to get the desired amount.
         // We will do the actual swap once we know how much fromToken we need to get it:
         uint256 amountETH;
-        (uint256 reserve10, uint256 reserve11, ) = pair1.getReserves();
-        if (toToken > WETH) {
-            amountETH = getAmountIn(amountToExact, reserve10, reserve11);
-        } else {
-            amountETH = getAmountIn(amountToExact, reserve11, reserve10);
+        {
+            (uint256 reserve10, uint256 reserve11, ) = pair1.getReserves();
+            if (toToken > WETH) {
+                amountETH = getAmountIn(amountToExact, reserve10, reserve11);
+            } else {
+                amountETH = getAmountIn(amountToExact, reserve11, reserve10);
+            }
         }
 
-        // Once we know how much FROM we need, send it to the FROM <-> ETH pair,
-        // and swap it for ETH. Send the ETH to the ETH <-> TO pair:
+        // Once we know how much FROM we need...
         uint256 amountFrom;
-        (uint256 reserve00, uint256 reserve01, ) = pair0.getReserves();
+        {
+            (uint256 reserve00, uint256 reserve01, ) = pair0.getReserves();
+            if (fromToken > WETH) {
+                amountFrom = getAmountIn(amountETH, reserve00, reserve01);
+            } else {
+                amountFrom = getAmountIn(amountETH, reserve01, reserve00);
+            }
+        }
+
+        // ...send it to the FROM <-> ETH pair,
+        // and swap it for ETH. Send the ETH to the ETH <-> TO pair:
+        // Why do the branches again? Stack depth.
         if (fromToken > WETH) {
-            amountFrom = getAmountIn(amountETH, reserve00, reserve01);
             (, shareUsed) = bentoBox.withdraw(fromToken, address(this), address(pair0), amountFrom, 0);
             pair0.swap(0, amountToExact, address(pair1), "");
         } else {
-            amountFrom = getAmountIn(amountETH, reserve01, reserve00);
             (, shareUsed) = bentoBox.withdraw(fromToken, address(this), address(pair0), amountFrom, 0);
             pair0.swap(amountToExact, 0, address(pair1), "");
         }
