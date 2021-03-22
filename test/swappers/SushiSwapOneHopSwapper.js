@@ -3,7 +3,7 @@ const { prepare, getBigNumber, createFixture } = require("@sushiswap/hardhat-fra
 
 let cmd, fixture
 
-describe("SushiSwapViaETHSwapper", function () {
+describe("SushiSwapOneHopSwapper", function () {
     before(async function () {
         fixture = await createFixture(deployments, this, async (cmd) => {
             await cmd.addToken("a", "Token A", "A", 18, this.ReturnFalseERC20Mock)
@@ -21,7 +21,7 @@ describe("SushiSwapViaETHSwapper", function () {
             await cmd.addPair("sushiSwapPairB", this.b, this.weth, 50000, 50000)
 
             await cmd.deploy("bentoBox", "BentoBoxMock", this.weth9.address)
-            await cmd.deploy("swapper", "SushiSwapViaETHSwapper",
+            await cmd.deploy("swapper", "SushiSwapOneHopSwapper",
                 this.bentoBox.address,
                 this.factory.address,
                 await this.factory.pairCodeHash(),

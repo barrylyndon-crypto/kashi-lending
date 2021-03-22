@@ -6,25 +6,25 @@ import "@sushiswap/core/contracts/uniswapv2/interfaces/IUniswapV2Pair.sol";
 import "../interfaces/ISwapper.sol";
 import "@sushiswap/bentobox-sdk/contracts/IBentoBoxV1.sol";
 
-contract SushiSwapViaETHSwapper is ISwapper {
+contract SushiSwapOneHopSwapper is ISwapper {
     using BoringMath for uint256;
 
     // Local variables
     IBentoBoxV1 public immutable bentoBox;
     IUniswapV2Factory public immutable factory;
-    IERC20 public immutable WETH;
+    IERC20 public immutable middleToken;
     bytes32 public pairCodeHash;
 
     constructor(
         IBentoBoxV1 bentoBox_,
         IUniswapV2Factory factory_,
         bytes32 pairCodeHash_,
-        IERC20 WETH_
+        IERC20 middleToken_
     ) public {
         bentoBox = bentoBox_;
         factory = factory_;
         pairCodeHash = pairCodeHash_;
-        WETH = WETH_;
+        middleToken = middleToken_;
     }
 
     // Given an input amount of an asset and pair reserves, returns the maximum output amount of the other asset
@@ -62,8 +62,8 @@ contract SushiSwapViaETHSwapper is ISwapper {
         IUniswapV2Pair pair0;
         IUniswapV2Pair pair1;
         {
-            (IERC20 token00, IERC20 token01) = fromToken < WETH ? (fromToken, WETH) : (WETH, fromToken);
-            (IERC20 token10, IERC20 token11) = WETH < toToken ? (WETH, toToken) : (toToken, WETH);
+            (IERC20 token00, IERC20 token01) = fromToken < middleToken ? (fromToken, middleToken) : (middleToken, fromToken);
+            (IERC20 token10, IERC20 token11) = middleToken < toToken ? (middleToken, toToken) : (toToken, middleToken);
             pair0 = IUniswapV2Pair(
                 uint256(
                     keccak256(abi.encodePacked(hex"ff", factory, keccak256(abi.encodePacked(address(token00), address(token01))), pairCodeHash))
@@ -80,27 +80,27 @@ contract SushiSwapViaETHSwapper is ISwapper {
         (uint256 amountFrom, ) = bentoBox.withdraw(fromToken, address(this), address(pair0), 0, shareFrom);
 
         // Swap FROM to ETH. Transfers to pair 1 (ETH <-> TO)
-        uint256 amountETH;
+        uint256 amountMiddle;
         {
             (uint256 reserve00, uint256 reserve01, ) = pair0.getReserves();
-            if (WETH > fromToken) {
-                amountETH = getAmountOut(amountFrom, reserve00, reserve01);
-                pair0.swap(0, amountETH, address(pair1), "");
+            if (middleToken > fromToken) {
+                amountMiddle = getAmountOut(amountFrom, reserve00, reserve01);
+                pair0.swap(0, amountMiddle, address(pair1), "");
             } else {
-                amountETH = getAmountOut(amountFrom, reserve01, reserve00);
-                pair0.swap(amountETH, 0, address(pair1), "");
+                amountMiddle = getAmountOut(amountFrom, reserve01, reserve00);
+                pair0.swap(amountMiddle, 0, address(pair1), "");
             }
         }
 
-        // Swap ETH to TO. Transfers to the Bentobox
+        // Swap ETH to TO. Transfers to the BentoBox
         uint256 amountTo;
         {
             (uint256 reserve10, uint256 reserve11, ) = pair1.getReserves();
-            if (toToken > WETH) {
-                amountTo = getAmountOut(amountETH, reserve10, reserve11);
+            if (toToken > middleToken) {
+                amountTo = getAmountOut(amountMiddle, reserve10, reserve11);
                 pair1.swap(0, amountTo, address(bentoBox), "");
             } else {
-                amountTo = getAmountOut(amountETH, reserve11, reserve10);
+                amountTo = getAmountOut(amountMiddle, reserve11, reserve10);
                 pair1.swap(amountTo, 0, address(bentoBox), "");
             }
         }
@@ -122,8 +122,8 @@ contract SushiSwapViaETHSwapper is ISwapper {
         IUniswapV2Pair pair0;
         IUniswapV2Pair pair1;
         {
-            (IERC20 token00, IERC20 token01) = fromToken < WETH ? (fromToken, WETH) : (WETH, fromToken);
-            (IERC20 token10, IERC20 token11) = WETH < toToken ? (WETH, toToken) : (toToken, WETH);
+            (IERC20 token00, IERC20 token01) = fromToken < middleToken ? (fromToken, middleToken) : (middleToken, fromToken);
+            (IERC20 token10, IERC20 token11) = middleToken < toToken ? (middleToken, toToken) : (toToken, middleToken);
             pair0 = IUniswapV2Pair(
                 uint256(
                     keccak256(abi.encodePacked(hex"ff", factory, keccak256(abi.encodePacked(address(token00), address(token01))), pairCodeHash))
@@ -142,13 +142,13 @@ contract SushiSwapViaETHSwapper is ISwapper {
 
         // See how much ETH we need to swap to get the desired amount.
         // We will do the actual swap once we know how much fromToken we need to get it:
-        uint256 amountETH;
+        uint256 amountMiddle;
         {
             (uint256 reserve10, uint256 reserve11, ) = pair1.getReserves();
-            if (toToken > WETH) {
-                amountETH = getAmountIn(amountToExact, reserve10, reserve11);
+            if (toToken > middleToken) {
+                amountMiddle = getAmountIn(amountToExact, reserve10, reserve11);
             } else {
-                amountETH = getAmountIn(amountToExact, reserve11, reserve10);
+                amountMiddle = getAmountIn(amountToExact, reserve11, reserve10);
             }
         }
 
@@ -156,17 +156,17 @@ contract SushiSwapViaETHSwapper is ISwapper {
         uint256 amountFrom;
         {
             (uint256 reserve00, uint256 reserve01, ) = pair0.getReserves();
-            if (fromToken > WETH) {
-                amountFrom = getAmountIn(amountETH, reserve00, reserve01);
+            if (fromToken > middleToken) {
+                amountFrom = getAmountIn(amountMiddle, reserve00, reserve01);
             } else {
-                amountFrom = getAmountIn(amountETH, reserve01, reserve00);
+                amountFrom = getAmountIn(amountMiddle, reserve01, reserve00);
             }
         }
 
         // ...send it to the FROM <-> ETH pair,
         // and swap it for ETH. Send the ETH to the ETH <-> TO pair:
         // Why do the branches again? Stack depth.
-        if (fromToken > WETH) {
+        if (fromToken > middleToken) {
             (, shareUsed) = bentoBox.withdraw(fromToken, address(this), address(pair0), amountFrom, 0);
             pair0.swap(0, amountToExact, address(pair1), "");
         } else {
@@ -175,7 +175,7 @@ contract SushiSwapViaETHSwapper is ISwapper {
         }
 
         // Swap the ETH that we just sent to TO, and send it to the BentoBox:
-        if (toToken > WETH) {
+        if (toToken > middleToken) {
             pair1.swap(0, amountToExact, address(bentoBox), "");
         } else {
             pair1.swap(amountToExact, 0, address(bentoBox), "");
