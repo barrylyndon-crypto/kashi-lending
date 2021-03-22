@@ -8,6 +8,7 @@ describe("SushiSwapOneHopSwapper", function () {
         fixture = await createFixture(deployments, this, async (cmd) => {
             await cmd.addToken("a", "Token A", "A", 18, this.ReturnFalseERC20Mock)
             await cmd.addToken("b", "Token B", "B", 8, this.RevertingERC20Mock)
+            await cmd.addToken("c", "Token C", "C", 18, this.RevertingERC20Mock)
 
 
             // TODO: This fails if we use the actual weth9 (mock) contract.
@@ -15,7 +16,6 @@ describe("SushiSwapOneHopSwapper", function () {
             //       Since the contract treats it as just another ERC20 token,
             //       we can just use this:
             await cmd.deploy("weth9", "WETH9Mock")
-            await cmd.addToken("weth", "Token B", "WETH", 18, this.RevertingERC20Mock)
 
             await cmd.addPair("sushiSwapPairA", this.a, this.weth, 50000, 50000)
             await cmd.addPair("sushiSwapPairB", this.b, this.weth, 50000, 50000)
@@ -36,7 +36,11 @@ describe("SushiSwapOneHopSwapper", function () {
 
     describe("Swap", function () {
         it("should swap", async function () {
-            // TODO: Verify calculations here.
+            // The setup method uses one "big number" (10^18) for liquidity also.
+            //
+            // Therefore, pairs have 50_000 liquidity, and we are trading 20.
+            //
+            // Expected
 
             await this.a.approve(this.bentoBox.address, getBigNumber(100))
             await this.bentoBox.deposit(this.a.address, this.alice.address, this.alice.address, getBigNumber(100), 0)
