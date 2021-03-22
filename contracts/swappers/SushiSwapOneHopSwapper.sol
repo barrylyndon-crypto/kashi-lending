@@ -156,7 +156,7 @@ contract SushiSwapOneHopSwapper is ISwapper {
         uint256 amountFrom;
         {
             (uint256 reserve00, uint256 reserve01, ) = pair0.getReserves();
-            if (fromToken > middleToken) {
+            if (middleToken > fromToken) {
                 amountFrom = getAmountIn(amountMiddle, reserve00, reserve01);
             } else {
                 amountFrom = getAmountIn(amountMiddle, reserve01, reserve00);
@@ -166,12 +166,11 @@ contract SushiSwapOneHopSwapper is ISwapper {
         // ...send it to the FROM <-> ETH pair,
         // and swap it for ETH. Send the ETH to the ETH <-> TO pair:
         // Why do the branches again? Stack depth.
-        if (fromToken > middleToken) {
-            (, shareUsed) = bentoBox.withdraw(fromToken, address(this), address(pair0), amountFrom, 0);
-            pair0.swap(0, amountToExact, address(pair1), "");
+        (, shareUsed) = bentoBox.withdraw(fromToken, address(this), address(pair0), amountFrom, 0);
+        if (middleToken > fromToken) {
+            pair0.swap(0, amountMiddle, address(pair1), "");
         } else {
-            (, shareUsed) = bentoBox.withdraw(fromToken, address(this), address(pair0), amountFrom, 0);
-            pair0.swap(amountToExact, 0, address(pair1), "");
+            pair0.swap(amountMiddle, 0, address(pair1), "");
         }
 
         // Swap the ETH that we just sent to TO, and send it to the BentoBox:
